@@ -4,19 +4,16 @@
 #define MAX_ROW 100
 #define MAX_COL 100
 
-// Structure to represent a node in the adjacency list
 struct Node {
     int x, y;
     struct Node* next;
 };
 
-// Structure to represent the maze
 struct Maze {
     int rows, cols;
     struct Node* cells[MAX_ROW][MAX_COL];
 };
 
-// Function to create a new node for the adjacency list
 struct Node* createNode(int x, int y) {
     struct Node* newNode = (struct Node*)malloc(sizeof(struct Node));
     newNode->x = x;
@@ -25,129 +22,124 @@ struct Node* createNode(int x, int y) {
     return newNode;
 }
 
-// Function to add an edge (neighbor) to the adjacency list
-void addEdge(struct Maze* Maze, int x1, int y1, int x2, int y2) {
-    struct Node* newNode = createNode(x2, y2);
-    newNode->next = Maze->cells[x1][y1];
-    Maze->cells[x1][y1] = newNode;
-}
-
-// Function to check if a point is inside the maze
 int isInsideMaze(struct Maze* Maze, int x, int y) {
     return x >= 0 && x < Maze->rows && y >= 0 && y < Maze->cols;
 }
 
-// Function to check if a cell is a valid path
 int isPath(struct Maze* Maze, int x, int y) {
     return isInsideMaze(Maze, x, y) && Maze->cells[x][y] != NULL;
 }
 
-// Function to read the maze from a file
 void readMazeFromFile(struct Maze* Maze) {
-    FILE *fptr;
-    fptr = fopen("maze.txt","r");
+    FILE *fptr = fopen("maze.txt", "r");
     if (fptr == NULL) { perror("Error opening file"); exit(EXIT_FAILURE); }
 
     fscanf(fptr, "%d %d", &Maze->rows, &Maze->cols);
-
-    for (int i = 0; i < Maze->rows; ++i)
+    for (int i = 0; i < Maze->rows; ++i) {
         for (int j = 0; j < Maze->cols; ++j) {
             char cell;
             fscanf(fptr, " %c", &cell);
             Maze->cells[i][j] = (cell == '.') ? createNode(i, j) : NULL;
         }
-
+    }
     fclose(fptr);
 }
 
-// Function to print the maze
-void printMaze(struct Maze* Maze) {
-    for (int i = 0; i < Maze->rows; ++i) {
-        for (int j = 0; j < Maze->cols; ++j) {
-            if (Maze->cells[i][j] != NULL) {
-                printf(". ");
-            } else {
-                printf("%c ", '#');
+int breadthFirstSearch(struct Maze* Maze, int startRow, int startCol, int endRow, int endCol, int path[][2], int* pathLen) {
+    int visited[MAX_ROW][MAX_COL] = {0};
+    int parent[MAX_ROW][MAX_COL][2];
+
+    int dx[] = {0, 1, 0, -1};
+    int dy[] = {1, 0, -1, 0};
+
+    struct Node* queue[MAX_ROW * MAX_COL];
+    int front = 0, rear = 0;
+
+    queue[rear++] = createNode(startRow, startCol);
+    visited[startRow][startCol] = 1;
+    parent[startRow][startCol][0] = -1;
+    parent[startRow][startCol][1] = -1;
+
+    while (front < rear) {
+        struct Node* curr = queue[front++];
+        int x = curr->x;
+        int y = curr->y;
+        free(curr);
+
+        if (x == endRow && y == endCol) {
+            int px = x, py = y;
+            *pathLen = 0;
+            while (px != -1 && py != -1) {
+                path[(*pathLen)][0] = px;
+                path[(*pathLen)++][1] = py;
+                int tx = parent[px][py][0];
+                int ty = parent[px][py][1];
+                px = tx; py = ty;
+            }
+            return 1;
+        }
+
+        for (int i = 0; i < 4; ++i) {
+            int nx = x + dx[i], ny = y + dy[i];
+            if (isPath(Maze, nx, ny) && !visited[nx][ny]) {
+                visited[nx][ny] = 1;
+                parent[nx][ny][0] = x;
+                parent[nx][ny][1] = y;
+                queue[rear++] = createNode(nx, ny);
             }
         }
-        printf("\n");
     }
+    return 0;
 }
 
-// Function to perform breadth-first search
-int breadthFirstSearch(struct Maze* Maze, int startRow, int startCol, int endRow, int endCol) {
-    // Your BFS implementation using the adjacency list representation
-    // Here, you can traverse the maze using BFS to find a path from (startX, startY) to (endX, endY)
-    // Use the adjacency list structure to perform BFS
-    int visited[MAX_ROW][MAX_COL] = {0};
-        int dx[] = {0, 1, 0, -1}; // Right, Down, Left, Up
-        int dy[] = {1, 0, -1, 0};
+void writeMazeJSON(struct Maze* Maze, int startRow, int startCol, int endRow, int endCol, int path[][2], int pathLen) {
+    FILE *out = fopen("maze.json", "w");
+    if (!out) { perror("Cannot write maze.json"); exit(1); }
 
-        struct Node* queue = createNode(startRow, startCol);
-        visited[startRow][startCol] = 1;
-
-        while (queue != NULL) {
-            int currentX = queue->x;
-            int currentY = queue->y;
-
-            if (currentX == endRow && currentY == endCol) {
-                // Destination reached
-                return 1;
-            }
-
-            // Explore neighbors
-            for (int i = 0; i < 4; ++i) {
-                int nx = currentX + dx[i];
-                int ny = currentY + dy[i];
-
-                if (isPath(Maze, nx, ny) && !visited[nx][ny]) {
-                    visited[nx][ny] = 1;
-                    addEdge(Maze, currentX, currentY, nx, ny);
-
-                    // Enqueue the neighbor
-                    struct Node* newNode = createNode(nx, ny);
-                    newNode->next = queue;
-                    queue = newNode;
-                }
-            }
-
-            // Dequeue the current node
-            struct Node* temp = queue;
-            queue = queue->next;
-            free(temp);
+    fprintf(out, "{\n  \"maze\": [\n");
+    for (int i = 0; i < Maze->rows; ++i) {
+        fprintf(out, "    [");
+        for (int j = 0; j < Maze->cols; ++j) {
+            fprintf(out, "\"%c\"", Maze->cells[i][j] ? '.' : '#');
+            if (j < Maze->cols - 1) fprintf(out, ",");
         }
-
-        return 0; // No path found
+        fprintf(out, "]");
+        if (i < Maze->rows - 1) fprintf(out, ",");
+        fprintf(out, "\n");
     }
+    fprintf(out, "  ],\n");
 
+    fprintf(out, "  \"start\": [%d, %d],\n", startRow, startCol);
+    fprintf(out, "  \"end\": [%d, %d],\n", endRow, endCol);
+    fprintf(out, "  \"path\": [\n");
+    for (int i = pathLen - 1; i >= 0; --i) {
+        fprintf(out, "    [%d, %d]%s\n", path[i][0], path[i][1], i ? "," : "");
+    }
+    fprintf(out, "  ]\n}\n");
 
-   
+    fclose(out);
+}
 
-// Main function
 int main() {
-   
     struct Maze Maze;
-    for (int i = 0; i < MAX_ROW; ++i) {
-           for (int j = 0; j < MAX_COL; ++j) {
-               Maze.cells[i][j] = NULL;
-           }
-       }
+    for (int i = 0; i < MAX_ROW; ++i)
+        for (int j = 0; j < MAX_COL; ++j)
+            Maze.cells[i][j] = NULL;
 
     readMazeFromFile(&Maze);
 
-    printf("Original Maze:\n");
-    printMaze(&Maze);
-
-    // Example: Call BFS from (0, 0) to (2, 3)
     int startRow = 0, startCol = 0;
-    int endRow = 2, endCol = 3;
+    int endRow = Maze.rows - 1, endCol = Maze.cols - 1;
 
-    if (breadthFirstSearch(&Maze, startRow, startCol, endRow, endCol)) {
-        printf("Path found from (%d, %d) to (%d, %d)\n", startRow, startCol, endRow, endCol);
-        // Print the path or perform additional actions
-    } else {
+    int path[MAX_ROW * MAX_COL][2], pathLen = 0;
+    int found = breadthFirstSearch(&Maze, startRow, startCol, endRow, endCol, path, &pathLen);
+
+    if (found)
+        printf("Path found.\n");
+    else
         printf("No path found.\n");
-    }
+
+    writeMazeJSON(&Maze, startRow, startCol, endRow, endCol, path, pathLen);
 
     return 0;
 }
