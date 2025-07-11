@@ -1,1 +1,5 @@
-
+'.' represents an open path (white cell).
+'#' represents a wall (black cell).
+The start cell is green.
+The end cell is red.
+The path (if found) will be shown in blue .
