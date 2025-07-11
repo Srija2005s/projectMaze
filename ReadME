@@ -1,3 +1,21 @@
+This project is a Maze Solver and Visualizer that combines the power of C for algorithmic maze solving and web technologies (HTML, CSS, JS) for intuitive visualization.
+
+🔹 Problem Statement
+Given a maze represented as a 2D grid with:
+
+. for paths (walkable),
+
+# or other characters for walls (non-walkable),
+
+The goal is to:
+
+*** Find a path from a start point to an end point using Breadth-First Search (BFS),
+
+*** Export the maze and the discovered path to a JSON file,
+
+*** Visually display the maze and the path in a web browser.
+
+
 '.' represents an open path (white cell).
 '#' represents a wall (black cell).
 The start cell is green.
